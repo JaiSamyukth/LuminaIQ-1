@@ -13,15 +13,15 @@ Tables managed:
 """
 
 from typing import List, Dict, Any, Optional
-from datetime import date, datetime
-from db.client import supabase_client
+from datetime import date, datetime, timedelta
+from db.client import get_supabase_client
 from utils.logger import logger
 from uuid import uuid4
 
 
 class UserDataService:
     def __init__(self):
-        self.client = supabase_client
+        self.client = get_supabase_client()
 
     # ===================== 1. User Settings =====================
 
@@ -93,7 +93,8 @@ class UserDataService:
 
     async def add_bookmark(
         self, user_id: str, project_id: str, title: str,
-        note: str = "", document_id: str = None, bookmark_type: str = "general"
+        note: str = "", document_id: str = None, bookmark_type: str = "general",
+        highlight_text: str = None, color: str = None
     ) -> Dict[str, Any]:
         try:
             record = {
@@ -105,6 +106,10 @@ class UserDataService:
                 "document_id": document_id,
                 "type": bookmark_type,
             }
+            if highlight_text is not None:
+                record["highlight_text"] = highlight_text
+            if color is not None:
+                record["color"] = color
             result = self.client.table("bookmarks").insert(record).execute()
             return result.data[0] if result.data else record
         except Exception as e:
@@ -113,7 +118,7 @@ class UserDataService:
 
     async def update_bookmark(self, user_id: str, bookmark_id: str, updates: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            allowed = {"title", "note", "type"}
+            allowed = {"title", "note", "type", "highlight_text", "color"}
             filtered = {k: v for k, v in updates.items() if k in allowed}
             result = (
                 self.client.table("bookmarks")
@@ -515,7 +520,7 @@ class UserDataService:
                     # Already studied today
                     return {"current": current, "longest": longest, "lastStudyDate": today}
 
-                yesterday = date.today().replace(day=date.today().day - 1).isoformat() if date.today().day > 1 else None
+                yesterday = (date.today() - timedelta(days=1)).isoformat()
                 if last_date == yesterday:
                     current += 1
                 else:
